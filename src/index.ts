@@ -1,18 +1,58 @@
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
-import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
+import {
+  CallToolRequestSchema,
+  ListToolsRequestSchema,
+  ListPromptsRequestSchema,
+  GetPromptRequestSchema,
+  ListResourcesRequestSchema,
+  ReadResourceRequestSchema,
+} from '@modelcontextprotocol/sdk/types.js';
 import { PRODUCT_TOOLS, callProductTool } from './tools/products.js';
 import { ORDER_TOOLS, callOrderTool } from './tools/orders.js';
 import { ASSET_TOOLS, callAssetTool } from './tools/assets.js';
+import { DESIGN_RULES } from './rules/design-rules.js';
+import { SCHEMA_REFERENCE } from './rules/schema-reference.js';
 
 const ALL_TOOLS = [...PRODUCT_TOOLS, ...ORDER_TOOLS, ...ASSET_TOOLS];
 
 const server = new Server(
   { name: 'chamevo-mcp', version: '0.1.0' },
-  { capabilities: { tools: {} } }
+  { capabilities: { tools: {}, prompts: {}, resources: {} } }
 );
 
 server.setRequestHandler(ListToolsRequestSchema, async () => ({ tools: ALL_TOOLS }));
+
+server.setRequestHandler(ListPromptsRequestSchema, async () => ({
+  prompts: [
+    { name: 'design-rules', description: 'Chamevo product/view/element composition conventions and best practices' },
+  ],
+}));
+
+server.setRequestHandler(GetPromptRequestSchema, async (req) => {
+  if (req.params.name === 'design-rules') {
+    return { messages: [{ role: 'user' as const, content: { type: 'text' as const, text: DESIGN_RULES } }] };
+  }
+  throw new Error(`Unknown prompt: ${req.params.name}`);
+});
+
+server.setRequestHandler(ListResourcesRequestSchema, async () => ({
+  resources: [
+    {
+      uri: 'chamevo://schema',
+      name: 'Chamevo Data Schema Reference',
+      mimeType: 'text/markdown',
+      description: 'Type definitions for CVProduct, CVView, CVElementData, ElementType, and all parameter types',
+    },
+  ],
+}));
+
+server.setRequestHandler(ReadResourceRequestSchema, async (req) => {
+  if (req.params.uri === 'chamevo://schema') {
+    return { contents: [{ uri: 'chamevo://schema', mimeType: 'text/markdown', text: SCHEMA_REFERENCE }] };
+  }
+  throw new Error(`Unknown resource: ${req.params.uri}`);
+});
 
 server.setRequestHandler(CallToolRequestSchema, async (request) => {
   const { name, arguments: args = {} } = request.params;
