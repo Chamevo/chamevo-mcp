@@ -44,6 +44,7 @@ export const PRODUCT_TOOLS: Tool[] = [
           enum: ['catalog', 'template'],
           description: 'Product type (default: catalog)',
         },
+        thumbnail: { type: 'string', description: 'URL of the product thumbnail image' },
         duplicate_product_id: {
           type: 'number',
           description: 'Clone an existing product by its ID',
@@ -181,6 +182,7 @@ export async function callProductTool(
       return client.createProduct({
         title: args.title as string | undefined,
         type: args.type as string | undefined,
+        thumbnail: args.thumbnail as string | undefined,
         duplicate_product_id: args.duplicate_product_id as number | undefined,
         template_id: args.template_id as number | undefined,
       });

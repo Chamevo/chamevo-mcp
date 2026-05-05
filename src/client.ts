@@ -70,6 +70,7 @@ export function getProduct(id: number, include_views?: boolean): Promise<unknown
 export function createProduct(args: {
   title?: string;
   type?: string;
+  thumbnail?: string;
   duplicate_product_id?: number;
   template_id?: number;
 }): Promise<unknown> {
