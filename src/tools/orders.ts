@@ -27,6 +27,31 @@ export const ORDER_TOOLS: Tool[] = [
       },
     },
   },
+  {
+    name: 'update_order',
+    description:
+      'Update the customization data attached to an order. For WooCommerce ("wc"), the design data is stored per order item — pass item_id (or use the item id as the order id).',
+    inputSchema: {
+      type: 'object',
+      required: ['id', 'order'],
+      properties: {
+        id: { type: 'number', description: 'Order ID (WooCommerce) or order/entry ID' },
+        order: {
+          type: 'object',
+          description: 'The design data payload to persist (object or array)',
+        },
+        type: {
+          type: 'string',
+          description: 'Order type adapter (default: "wc")',
+          enum: ['wc', 'sc', 'gf'],
+        },
+        item_id: {
+          type: 'number',
+          description: 'WooCommerce only: the order item ID to write the design data to',
+        },
+      },
+    },
+  },
 ];
 
 export async function callOrderTool(
@@ -38,6 +63,13 @@ export async function callOrderTool(
       return client.getOrder(args.id as number, {
         type: args.type as string | undefined,
         item_key: args.item_key as string | undefined,
+        item_id: args.item_id as number | undefined,
+      });
+
+    case 'update_order':
+      return client.updateOrder(args.id as number, {
+        order: args.order,
+        type: args.type as string | undefined,
         item_id: args.item_id as number | undefined,
       });
 

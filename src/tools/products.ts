@@ -13,6 +13,11 @@ export const PRODUCT_TOOLS: Tool[] = [
         limit: { type: 'number', description: 'Items per page, max 100 (default: 20)' },
         search: { type: 'string', description: 'Filter by product title' },
         category_id: { type: 'number', description: 'Filter by category ID' },
+        type: {
+          type: 'string',
+          enum: ['catalog', 'template'],
+          description: 'Product type to list (default: catalog). Use "template" to list saved templates.',
+        },
       },
     },
   },
@@ -170,6 +175,7 @@ export async function callProductTool(
         limit: args.limit as number | undefined,
         search: args.search as string | undefined,
         category_id: args.category_id as number | undefined,
+        type: args.type as string | undefined,
       });
 
     case 'get_product':

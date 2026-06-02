@@ -1,6 +1,6 @@
 {
   "name": "@chamevo/mcp",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "MCP server for the Chamevo WordPress plugin REST API",
   "type": "module",
   "main": "dist/index.js",

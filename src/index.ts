@@ -8,17 +8,51 @@ import {
   GetPromptRequestSchema,
   ListResourcesRequestSchema,
   ReadResourceRequestSchema,
+  type Tool,
 } from '@modelcontextprotocol/sdk/types.js';
 import { PRODUCT_TOOLS, callProductTool } from './tools/products.js';
 import { ORDER_TOOLS, callOrderTool } from './tools/orders.js';
 import { ASSET_TOOLS, callAssetTool } from './tools/assets.js';
+import { CATEGORY_TOOLS, callCategoryTool } from './tools/categories.js';
+import { DESIGN_CATEGORY_TOOLS, callDesignCategoryTool } from './tools/design-categories.js';
+import { PRICING_RULE_TOOLS, callPricingRuleTool } from './tools/pricing-rules.js';
+import { PRINT_PROFILE_TOOLS, callPrintProfileTool } from './tools/print-profiles.js';
+import { USER_INTERFACE_TOOLS, callUserInterfaceTool } from './tools/user-interfaces.js';
+import { SHORTCODE_ORDER_TOOLS, callShortcodeOrderTool } from './tools/shortcode-orders.js';
+import { PRINT_JOB_TOOLS, callPrintJobTool } from './tools/print-jobs.js';
+import { SETTINGS_TOOLS, callSettingsTool } from './tools/settings.js';
+import { FONT_TOOLS, callFontTool } from './tools/fonts.js';
+import { SYSTEM_TOOLS, callSystemTool } from './tools/system.js';
 import { DESIGN_RULES } from './rules/design-rules.js';
 import { SCHEMA_REFERENCE } from './rules/schema-reference.js';
 
-const ALL_TOOLS = [...PRODUCT_TOOLS, ...ORDER_TOOLS, ...ASSET_TOOLS];
+type ToolHandler = (name: string, args: Record<string, unknown>) => Promise<unknown>;
+
+/**
+ * Tool registry — one entry per domain module. Each entry pairs a tool
+ * definition list with the handler that dispatches its calls. To add a new
+ * domain, append one entry here.
+ */
+const TOOL_GROUPS: Array<{ tools: Tool[]; call: ToolHandler }> = [
+  { tools: SYSTEM_TOOLS, call: callSystemTool },
+  { tools: PRODUCT_TOOLS, call: callProductTool },
+  { tools: CATEGORY_TOOLS, call: callCategoryTool },
+  { tools: DESIGN_CATEGORY_TOOLS, call: callDesignCategoryTool },
+  { tools: PRICING_RULE_TOOLS, call: callPricingRuleTool },
+  { tools: PRINT_PROFILE_TOOLS, call: callPrintProfileTool },
+  { tools: USER_INTERFACE_TOOLS, call: callUserInterfaceTool },
+  { tools: ORDER_TOOLS, call: callOrderTool },
+  { tools: SHORTCODE_ORDER_TOOLS, call: callShortcodeOrderTool },
+  { tools: PRINT_JOB_TOOLS, call: callPrintJobTool },
+  { tools: ASSET_TOOLS, call: callAssetTool },
+  { tools: FONT_TOOLS, call: callFontTool },
+  { tools: SETTINGS_TOOLS, call: callSettingsTool },
+];
+
+const ALL_TOOLS: Tool[] = TOOL_GROUPS.flatMap((g) => g.tools);
 
 const server = new Server(
-  { name: 'chamevo-mcp', version: '0.1.0' },
+  { name: 'chamevo-mcp', version: '0.3.0' },
   { capabilities: { tools: {}, prompts: {}, resources: {} } }
 );
 
@@ -59,17 +93,12 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
   const { name, arguments: args = {} } = request.params;
 
   try {
-    let result: unknown;
-
-    if (PRODUCT_TOOLS.some((t) => t.name === name)) {
-      result = await callProductTool(name, args as Record<string, unknown>);
-    } else if (ORDER_TOOLS.some((t) => t.name === name)) {
-      result = await callOrderTool(name, args as Record<string, unknown>);
-    } else if (ASSET_TOOLS.some((t) => t.name === name)) {
-      result = await callAssetTool(name, args as Record<string, unknown>);
-    } else {
+    const group = TOOL_GROUPS.find((g) => g.tools.some((t) => t.name === name));
+    if (!group) {
       throw new Error(`Unknown tool: ${name}`);
     }
+
+    const result = await group.call(name, args as Record<string, unknown>);
 
     return {
       content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }],
