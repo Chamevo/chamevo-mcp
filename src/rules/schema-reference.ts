@@ -149,7 +149,8 @@ Source: https://jsdoc.chamevo.com
 | \`textPlaceholder\` | \`boolean\` | Names & Numbers text placeholder |
 | \`numberPlaceholder\` | \`boolean | number[]\` | Names & Numbers number placeholder |
 | \`textLinkGroup\` | \`string\` | Link text value across elements |
-| \`widthFontSize\` | \`number\` | Scale font to fit width (0 = off) |
+| \`widthFontSize\` | \`number\` | Scale font to fit width (0 = off; exclusive with heightFontSize) |
+| \`heightFontSize\` | \`number\` | Scale font to fit height (0 = off; exclusive with widthFontSize) |
 | \`curved\` | \`boolean\` | Enable curved text |
 | \`curvable\` | \`boolean\` | Allow user to toggle curved/straight |
 | \`curveRadius\` | \`number\` | Curve radius |
