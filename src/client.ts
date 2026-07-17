@@ -26,21 +26,67 @@ function buildQuery(params: Record<string, string | number | boolean | undefined
   return s ? `?${s}` : '';
 }
 
-async function apiFetch(method: string, path: string, body?: unknown): Promise<unknown> {
+/** Ceiling for ordinary requests — a hung site should fail, not block the client forever. */
+const DEFAULT_TIMEOUT_MS = 30_000;
+
+/**
+ * The export route renders the file before responding and blocks for up to
+ * ExportService::JOB_TIMEOUT (180s) while polling the export service. Allow
+ * headroom on top of that so a slow-but-working export is never cut short.
+ */
+const EXPORT_TIMEOUT_MS = 240_000;
+
+/**
+ * Parse a response body as JSON, failing with the raw payload in the message.
+ *
+ * WordPress does not always answer with JSON: a WAF, a PHP fatal, or a login
+ * redirect returns HTML. Parsing that blindly throws an opaque SyntaxError, so
+ * surface the status and a snippet of what actually came back instead.
+ */
+async function parseJson(response: Response): Promise<unknown> {
+  const raw = await response.text();
+
+  if (!raw) return null;
+
+  try {
+    return JSON.parse(raw);
+  } catch {
+    const snippet = raw.slice(0, 200).replace(/\s+/g, ' ').trim();
+    throw new Error(
+      `API ${response.status}: expected JSON but got ${response.headers.get('content-type') ?? 'unknown content-type'} — ${snippet}`
+    );
+  }
+}
+
+async function apiFetch(
+  method: string,
+  path: string,
+  body?: unknown,
+  timeoutMs: number = DEFAULT_TIMEOUT_MS
+): Promise<unknown> {
   const { apiToken } = getConfig();
   const url = `${baseUrl()}${path}`;
 
-  const response = await fetch(url, {
-    method,
-    headers: {
-      Authorization: `Bearer ${apiToken}`,
-      'Content-Type': 'application/json',
-      Accept: 'application/json',
-    },
-    body: body !== undefined ? JSON.stringify(body) : undefined,
-  });
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      method,
+      headers: {
+        Authorization: `Bearer ${apiToken}`,
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+      },
+      body: body !== undefined ? JSON.stringify(body) : undefined,
+      signal: AbortSignal.timeout(timeoutMs),
+    });
+  } catch (error) {
+    if (error instanceof Error && error.name === 'TimeoutError') {
+      throw new Error(`Request timed out after ${timeoutMs / 1000}s: ${method} ${path}`);
+    }
+    throw error;
+  }
 
-  const data = await response.json();
+  const data = await parseJson(response);
 
   if (!response.ok) {
     const message = (data as { message?: string })?.message ?? response.statusText;
@@ -140,6 +186,15 @@ export function deleteView(id: number): Promise<unknown> {
 // Orders
 // ---------------------------------------------------------------------------
 
+export function listOrders(params?: {
+  type?: string;
+  page?: number;
+  limit?: number;
+  search?: string;
+}): Promise<unknown> {
+  return apiFetch('GET', `/orders${buildQuery({ ...params })}`);
+}
+
 export function getOrder(
   id: number,
   params?: { type?: string; item_key?: string; item_id?: number }
@@ -152,6 +207,28 @@ export function updateOrder(
   args: { order: unknown; type?: string; item_id?: number }
 ): Promise<unknown> {
   return apiFetch('PATCH', `/orders/${id}`, args);
+}
+
+export function deleteOrder(id: number, type: string = 'sc'): Promise<unknown> {
+  return apiFetch('DELETE', `/orders/${id}${buildQuery({ type })}`);
+}
+
+/**
+ * Generate a print-ready file from an order's stored design.
+ * Blocks while the export service renders — hence the extended timeout.
+ */
+export function exportOrder(
+  id: number,
+  args: {
+    type?: string;
+    item_id?: number;
+    output_format?: string;
+    dpi?: number;
+    include_font_files?: boolean;
+    summary_json?: boolean;
+  }
+): Promise<unknown> {
+  return apiFetch('POST', `/orders/${id}/export`, args, EXPORT_TIMEOUT_MS);
 }
 
 // ---------------------------------------------------------------------------
@@ -479,6 +556,57 @@ export function uploadFont(filePath: string, name?: string): Promise<unknown> {
 
 export function deleteFont(name: string): Promise<unknown> {
   return apiFetch('DELETE', `/fonts/${encodeURIComponent(name)}`);
+}
+
+// ---------------------------------------------------------------------------
+// Text templates
+// ---------------------------------------------------------------------------
+
+export interface TextTemplateFields {
+  text?: string;
+  font_family?: string;
+  font_size?: number;
+  text_align?: string;
+}
+
+export function listTextTemplates(): Promise<unknown> {
+  return apiFetch('GET', '/text-templates');
+}
+
+export function getTextTemplate(index: number): Promise<unknown> {
+  return apiFetch('GET', `/text-templates/${index}`);
+}
+
+export function createTextTemplate(args: TextTemplateFields): Promise<unknown> {
+  return apiFetch('POST', '/text-templates', args);
+}
+
+export function updateTextTemplate(index: number, args: TextTemplateFields): Promise<unknown> {
+  return apiFetch('PATCH', `/text-templates/${index}`, args);
+}
+
+export function deleteTextTemplate(index: number): Promise<unknown> {
+  return apiFetch('DELETE', `/text-templates/${index}`);
+}
+
+export function replaceTextTemplates(templates: TextTemplateFields[]): Promise<unknown> {
+  return apiFetch('PUT', '/text-templates', { templates });
+}
+
+// ---------------------------------------------------------------------------
+// Color library
+// ---------------------------------------------------------------------------
+
+export function getColorLibrary(): Promise<unknown> {
+  return apiFetch('GET', '/color-library');
+}
+
+export function saveColorLibrary(library: Record<string, unknown>): Promise<unknown> {
+  return apiFetch('PUT', '/color-library', library);
+}
+
+export function getColorLibraryUsages(id: string, type: string): Promise<unknown> {
+  return apiFetch('GET', `/color-library/usages${buildQuery({ id, type })}`);
 }
 
 // ---------------------------------------------------------------------------

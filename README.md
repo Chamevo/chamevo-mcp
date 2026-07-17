@@ -269,13 +269,57 @@ Permanently delete a view.
 
 ### Orders
 
-#### `GET /orders/{id}`
+Three order sources share these routes, selected by `type`:
 
-Retrieve customization data attached to a WooCommerce order.
+| `type` | Source | Notes |
+|---|---|---|
+| `wc` | WooCommerce order | design data lives **per order item** — pass `item_id` |
+| `sc` | Standalone shortcode order | the only deletable type |
+| `gf` | Gravity Forms entry | `{id}` is the entry id |
+
+An unknown `type`, or one whose integration is inactive, returns `400`.
+
+#### `GET /orders`
+
+List orders that carry a Chamevo design, newest first.
 
 | Query param | Type | Default | Description |
 |---|---|---|---|
-| `type` | string | `wc` | Order type adapter |
+| `type` | string | `wc` | Order source (`wc`, `sc`, `gf`) |
+| `page` | integer | 1 | Page number |
+| `limit` | integer | 20 | Items per page (max 100) |
+| `search` | string | — | Filter by customer, order number, or e-mail |
+
+Rows are identical to the admin order list. Every order (or WooCommerce order
+item) that already has a generated print file carries a `print_file_url`.
+
+**Response**
+```json
+{
+  "success": true,
+  "data": [
+    { "id": 33, "created_date": "...", "customer_name": "...", "print_file_url": "https://…/33.pdf" }
+  ],
+  "meta": { "type": "sc", "page": 1, "limit": 20, "total": 26, "pages": 2 }
+}
+```
+
+WooCommerce rows carry an `order_items` array instead — the design (and the
+`print_file_url`) sits on the item:
+
+```json
+{ "id": 3353, "order_items": [ { "id": 359, "print_file_url": "https://…/3353_359.pdf" } ] }
+```
+
+---
+
+#### `GET /orders/{id}`
+
+Retrieve the customization data attached to an order.
+
+| Query param | Type | Default | Description |
+|---|---|---|---|
+| `type` | string | `wc` | Order source (`wc`, `sc`, `gf`) |
 | `item_key` | string | `_fpd_data` | WP post meta key storing the design data |
 | `item_id` | integer | — | Specific order item ID (omit for all items) |
 
@@ -287,6 +331,8 @@ Retrieve customization data attached to a WooCommerce order.
 }
 ```
 
+---
+
 #### `PATCH /orders/{id}`
 
 Update the customization data attached to an order.
@@ -297,6 +343,77 @@ Update the customization data attached to an order.
 ```
 
 > WooCommerce stores design data **per order item**, so for `type: "wc"` pass the `item_id` to write to (or use the item id as `{id}`). For `sc`/`gf` the `{id}` is the order/entry id.
+
+---
+
+#### `DELETE /orders/{id}`
+
+Delete a **shortcode order**.
+
+| Query param | Type | Default | Description |
+|---|---|---|---|
+| `type` | string | `sc` | Only `sc` is accepted |
+
+WooCommerce orders and Gravity Forms entries are owned by those plugins and must
+be deleted there — any other `type` returns `400`.
+
+---
+
+#### `POST /orders/{id}/export`
+
+Generate a print-ready file from the order's **stored** design and return its URL.
+No canvas is involved — the design, fonts and file name are read from the order
+itself, so this is the API equivalent of the admin's Export panel.
+
+**Body (JSON)** — all optional except `item_id` for WooCommerce:
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `type` | string | `wc` | Order source (`wc`, `sc`, `gf`) |
+| `item_id` | integer | — | **Required for `wc`** — the order ITEM holding the design |
+| `output_format` | string | *Settings → Export* | `svg-pdf`, `png`, `jpeg`, `svg` |
+| `dpi` | integer | *Settings → Export* | Raster resolution |
+| `include_font_files` | boolean | *Settings → Export* | Bundle the used fonts |
+| `summary_json` | boolean | `false` | Add the PDF summary sheet |
+
+**Response** `201`
+```json
+{
+  "success": true,
+  "data": {
+    "file_url": "https://example.com/wp-content/uploads/chamevo/print_files/1784.../37.pdf",
+    "file": "1784.../37.pdf",
+    "print_job_id": "6a59d2ca6a54f",
+    "order_id": 37,
+    "order_type": "sc",
+    "item_id": null
+  }
+}
+```
+
+On failure the export service's own diagnosis is preserved:
+
+```json
+{
+  "success": false,
+  "message": "The export service encountered an error while processing this order.",
+  "error": {
+    "code": "SERVICE_ERROR",
+    "detail": "Failed to load element \"base\": Failed to load image from URL: …",
+    "fields": [],
+    "status": 500
+  }
+}
+```
+
+> **The request blocks while the file renders** (up to ~3 minutes) and **counts
+> against the licence's monthly order quota**, exactly like an export triggered
+> from the admin. Call it once per order and reuse the returned `file_url` — the
+> matching print job is also retrievable via `GET /print-jobs/{print_job_id}`.
+>
+> The export service fetches every image in the design over the public internet.
+> Designs referencing images on a host it cannot reach (a local dev domain, an
+> IP-restricted site) fail with `SERVICE_ERROR`.
 
 ---
 
@@ -414,6 +531,105 @@ Nested categories of ready-made graphics. Each carries `options`, `thumbnail`, o
 | `GET /print-jobs/{id}` | Single job |
 | `DELETE /print-jobs/{id}` | Delete the job |
 
+Every job carries a resolved `file_url` — the downloadable print file, or `null`
+while the job is still processing or has failed. Jobs are created by the export
+pipeline (`POST /orders/{id}/export`, the storefront, the admin), never directly.
+
+---
+
+### Text templates
+
+The ready-made text presets a customer can drop onto a product.
+
+They are stored as one list with **no per-entry id**, so a template is addressed
+by its position (`index`) — and positions shift when one is created or deleted.
+Re-read the list after either.
+
+| Method & path | Description |
+|---|---|
+| `GET /text-templates` | List every template (each carries its `index`) |
+| `POST /text-templates` | Append `{ "text", "font_family"?, "font_size"?, "text_align"? }` |
+| `PUT /text-templates` | Replace the whole list — `{ "templates": [...] }` (reorder / bulk import) |
+| `GET /text-templates/{index}` | One template |
+| `PATCH /text-templates/{index}` | Update only the supplied fields |
+| `DELETE /text-templates/{index}` | Remove it (later templates shift down) |
+
+| Field | Type | Default | Notes |
+|---|---|---|---|
+| `text` | string | — | Required, non-empty |
+| `font_family` | string | `""` | Must be a font the site offers (`GET /fonts`) |
+| `font_size` | integer | 16 | Positive |
+| `text_align` | string | `left` | `left`, `center`, `right` |
+
+**Response**
+```json
+{
+  "success": true,
+  "data": [
+    { "index": 0, "text": "Your Name Here", "font_family": "Roboto", "font_size": 24, "text_align": "center" }
+  ],
+  "meta": { "total": 1 }
+}
+```
+
+> The API shape above is **flat**, but the option stores each entry with its
+> styling nested under `properties` — and the storefront designer reads that
+> option raw, so the nested shape is load-bearing. This endpoint owns the
+> translation; writing `chamevo_text_templates` through `PATCH /settings` would
+> flatten it and break the designer, so that key is refused there.
+
+---
+
+### Color library
+
+The site's unified color model (schema v2): named colors and the palettes built
+from them, shared by the designer, print profiles, and pricing.
+
+| Method & path | Description |
+|---|---|
+| `GET /color-library` | The current library (+ `meta.persisted`) |
+| `PUT /color-library` | Validate and save a whole library — **replaces** it |
+| `GET /color-library/usages?id={id}&type=color\|palette` | Where a color/palette is referenced |
+
+**Response**
+```json
+{
+  "success": true,
+  "data": {
+    "version": 2,
+    "colors": [ { "id": "c-000000", "hex": "#000000", "name": "Black", "price": 10 } ],
+    "palettes": [ { "id": "p-brand", "name": "Brand Colors", "colorIds": ["c-1abc9c", "c-3498db"] } ]
+  },
+  "meta": { "persisted": true, "version": 2 }
+}
+```
+
+`PUT` **replaces** the model — anything omitted is deleted. Read first, change
+what you need, send the full model back. Colors keep stable ids, so editing a
+hex keeps every palette reference intact. A rejected model returns `400` with an
+`errors` list and writes nothing:
+
+```json
+{ "success": false, "message": "The color library could not be saved.", "errors": ["Duplicate color id \"a\"."] }
+```
+
+Usages is the pre-delete check. It is honest about its own coverage —
+`productsChecked: false` means product views could not be scanned, i.e.
+**unknown**, not "unused":
+
+```json
+{ "palettes": [ { "id": "p-shirt", "name": "Shirt Colors" } ],
+  "printProfiles": [], "pickerPreset": false, "productsChecked": false, "products": [] }
+```
+
+> **Why this is not just a setting.** The library lives in the
+> `chamevo_color_library` option, but writing it there directly does not work:
+> the reader only trusts a stored model carrying `version >= 2`, so a raw write
+> lands in the option and is then **silently ignored** — the model falls back to
+> the legacy color config and your write is lost with no error. Saving through
+> this endpoint is what validates, canonicalizes, stamps the version, and flushes
+> the caches. `PATCH /settings` refuses the key for that reason.
+
 ---
 
 ### Settings
@@ -426,6 +642,14 @@ All keys are restricted to the `chamevo_` namespace.
 | `GET /settings/values?keys[]=chamevo_responsive` | Current values for specific keys |
 | `GET /settings/groups/{tab}` | Every option in a tab with its current value |
 | `PATCH /settings` | Update `{ "chamevo_responsive": true, ... }` (booleans stored as `yes`/`no`) |
+
+Two keys are **read-only here** and return `400` on `PATCH`, because writing them
+raw corrupts them silently — they have dedicated endpoints instead:
+
+| Key | Use instead |
+|---|---|
+| `chamevo_color_library` | `PUT /color-library` |
+| `chamevo_text_templates` | `/text-templates` |
 
 ---
 
@@ -521,8 +745,10 @@ Optional controllers can be toggled under **Chamevo → Settings → General →
 | Print Jobs API | `PrintJobsController` | `/print-jobs` |
 | Settings API | `SettingsController` | `/settings` |
 | Fonts API | `FontsController` | `/fonts` |
+| Text Templates API | `TextTemplatesController` | `/text-templates` |
+| Color Library API | `ColorLibraryController` | `/color-library` |
 
-The **Orders** (`/orders`), **Export** (webhook), and **System** (`/system`) controllers are always enabled.
+The **Orders**, **Export** (webhook), and **System** (`/system`) controllers are always enabled. Orders covers `/orders` — listing, reading, updating, deleting **and** `POST /orders/{id}/export`.
 
 ---
 
@@ -532,7 +758,10 @@ To rotate the API token, clear the field under **Chamevo → Settings → Genera
 
 ## MCP tools reference
 
-58 tools across 13 domains.
+70 tools across 15 domains.
+
+A typical merchant workflow chains them: `get_system_info` → `list_orders` →
+`export_order` → download the returned `file_url`.
 
 **System**
 
@@ -596,8 +825,11 @@ To rotate the API token, clear the field under **Chamevo → Settings → Genera
 
 | Tool | Description |
 |---|---|
+| `list_orders` | Orders carrying a design (`wc`/`sc`/`gf`), with `print_file_url` |
 | `get_order` | Customization data for an order |
 | `update_order` | Update an order's design data |
+| `delete_order` | Delete a shortcode order (`sc` only) |
+| `export_order` | Generate a print-ready file and return its URL |
 
 **Shortcode orders**
 
@@ -619,10 +851,26 @@ To rotate the API token, clear the field under **Chamevo → Settings → Genera
 | `list_assets` / `upload_asset` | List / upload images and PDFs |
 | `list_fonts` / `upload_font` / `delete_font` | Manage custom TTF fonts |
 
+**Text templates**
+
+| Tool | Description |
+|---|---|
+| `list_text_templates` / `get_text_template` | List / get presets (addressed by `index`) |
+| `create_text_template` / `update_text_template` / `delete_text_template` | Manage one preset |
+| `replace_text_templates` | Replace the whole list (reorder / bulk import) |
+
+**Color library**
+
+| Tool | Description |
+|---|---|
+| `get_color_library` | Colors + palettes (read before saving) |
+| `save_color_library` | Validate and save the whole model |
+| `get_color_library_usages` | Where a color/palette is referenced — check before deleting |
+
 **Settings**
 
 | Tool | Description |
 |---|---|
 | `list_settings` | Searchable index of every `chamevo_*` setting |
 | `get_settings` / `get_settings_group` | Read specific keys / a whole tab |
-| `update_settings` | Update `chamevo_*` options |
+| `update_settings` | Update `chamevo_*` options (color library / text templates are refused — use their own tools) |

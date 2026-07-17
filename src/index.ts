@@ -22,6 +22,8 @@ import { SHORTCODE_ORDER_TOOLS, callShortcodeOrderTool } from './tools/shortcode
 import { PRINT_JOB_TOOLS, callPrintJobTool } from './tools/print-jobs.js';
 import { SETTINGS_TOOLS, callSettingsTool } from './tools/settings.js';
 import { FONT_TOOLS, callFontTool } from './tools/fonts.js';
+import { TEXT_TEMPLATE_TOOLS, callTextTemplateTool } from './tools/text-templates.js';
+import { COLOR_LIBRARY_TOOLS, callColorLibraryTool } from './tools/color-library.js';
 import { SYSTEM_TOOLS, callSystemTool } from './tools/system.js';
 import { DESIGN_RULES } from './rules/design-rules.js';
 import { SCHEMA_REFERENCE } from './rules/schema-reference.js';
@@ -46,6 +48,8 @@ const TOOL_GROUPS: Array<{ tools: Tool[]; call: ToolHandler }> = [
   { tools: PRINT_JOB_TOOLS, call: callPrintJobTool },
   { tools: ASSET_TOOLS, call: callAssetTool },
   { tools: FONT_TOOLS, call: callFontTool },
+  { tools: TEXT_TEMPLATE_TOOLS, call: callTextTemplateTool },
+  { tools: COLOR_LIBRARY_TOOLS, call: callColorLibraryTool },
   { tools: SETTINGS_TOOLS, call: callSettingsTool },
 ];
 
