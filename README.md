@@ -1,54 +1,23 @@
-# chamevo-mcp
+# @chamevo/mcp
 
-MCP (Model Context Protocol) server that exposes the Chamevo WordPress plugin REST API as tools for AI assistants such as Claude Desktop.
+MCP (Model Context Protocol) server for the [Chamevo](https://chamevo.com) WordPress plugin — manage products, orders, print profiles, pricing rules, and more from Claude and other AI assistants.
 
 ## Prerequisites
 
 - Node.js ≥ 18
 - A running WordPress site with the Chamevo plugin active
-- An API token from **Chamevo → General → API → API Token**
+- An API token from **Chamevo → Settings → General → API** in the WordPress admin (displayed read-only)
 
-## Setup
+## Quick start (Claude Desktop)
 
-```bash
-cd _dev/apps/mcp-server
-npm install
-npm run build
-```
-
-Copy the example env file and fill in your values:
-
-```bash
-cp .env.example .env
-```
-
-```
-CHAMEVO_SITE_URL=https://your-site.com
-CHAMEVO_API_TOKEN=your_token_here
-```
-
-> The API token is displayed (read-only) under **Chamevo → Settings → General → API** in the WordPress admin.
-
-## Running
-
-```bash
-# Production
-npm start
-
-# During development (watch + rebuild on change)
-npm run dev
-```
-
-## Claude Desktop integration
-
-Add this block to your `claude_desktop_config.json` (found at `~/Library/Application Support/Claude/claude_desktop_config.json` on macOS):
+No install needed — `npx` fetches the package on demand. Add this block to your `claude_desktop_config.json` (found at `~/Library/Application Support/Claude/claude_desktop_config.json` on macOS):
 
 ```json
 {
   "mcpServers": {
     "chamevo": {
-      "command": "node",
-      "args": ["/absolute/path/to/_dev/apps/mcp-server/dist/index.js"],
+      "command": "npx",
+      "args": ["-y", "@chamevo/mcp"],
       "env": {
         "CHAMEVO_SITE_URL": "https://your-site.com",
         "CHAMEVO_API_TOKEN": "your_token_here"
@@ -84,7 +53,7 @@ local command works. They share the same config shape — an `mcpServers` entry 
 ```
 
 > Running an **unpublished local build** instead? Swap `command`/`args` for
-> `"command": "node", "args": ["/absolute/path/_dev/apps/mcp-server/dist/index.js"]`.
+> `"command": "node", "args": ["/absolute/path/to/chamevo-mcp/dist/index.js"]`.
 
 Where each client expects that block:
 
@@ -127,6 +96,33 @@ Host the bridge somewhere reachable, **behind HTTPS and your own access control*
 the API token lives in the bridge's environment, so anyone who can reach the bridge
 URL can drive your Chamevo install. Then add the bridge URL as a custom MCP
 connector in the client.
+
+---
+
+## Development
+
+Working from a clone of this repo instead of the published package:
+
+```bash
+git clone https://github.com/Chamevo/chamevo-mcp.git
+cd chamevo-mcp
+npm install
+npm run build   # or: npm run dev (watch + rebuild on change)
+```
+
+Copy the example env file and fill in your values:
+
+```bash
+cp .env.example .env
+```
+
+```
+CHAMEVO_SITE_URL=https://your-site.com
+CHAMEVO_API_TOKEN=your_token_here
+```
+
+Then run `npm start`, or point your MCP client at the local build:
+`"command": "node", "args": ["/absolute/path/to/chamevo-mcp/dist/index.js"]`.
 
 ---
 
@@ -874,3 +870,9 @@ A typical merchant workflow chains them: `get_system_info` → `list_orders` →
 | `list_settings` | Searchable index of every `chamevo_*` setting |
 | `get_settings` / `get_settings_group` | Read specific keys / a whole tab |
 | `update_settings` | Update `chamevo_*` options (color library / text templates are refused — use their own tools) |
+
+---
+
+## License
+
+[MIT](LICENSE) © radykal GmbH
