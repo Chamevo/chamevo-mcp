@@ -8,6 +8,8 @@ MCP (Model Context Protocol) server for the [Chamevo](https://chamevo.com) WordP
 - A running WordPress site with the Chamevo plugin active
 - An API token from **Chamevo → Settings → General → API** in the WordPress admin (displayed read-only)
 
+  ![Chamevo Settings → General → API — API Token field](https://raw.githubusercontent.com/Chamevo/chamevo-mcp/main/docs/images/api-token-settings.png)
+
 ## Quick start (Claude Desktop)
 
 No install needed — `npx` fetches the package on demand. Add this block to your `claude_desktop_config.json` (found at `~/Library/Application Support/Claude/claude_desktop_config.json` on macOS):
