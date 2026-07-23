@@ -1,6 +1,6 @@
 {
   "name": "@chamevo/mcp",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "MCP server for the Chamevo WordPress plugin — manage products, orders, print profiles, and pricing rules from Claude and other AI assistants",
   "license": "MIT",
   "repository": {
