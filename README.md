@@ -875,4 +875,4 @@ A typical merchant workflow chains them: `get_system_info` → `list_orders` →
 
 ## License
 
-[MIT](LICENSE) © radykal GmbH
+[MIT](LICENSE) © Chamevo
