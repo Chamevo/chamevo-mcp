@@ -194,6 +194,8 @@ Source: https://jsdoc.chamevo.com
 | \`color\` | \`string?\` | Active state color (default: "#2196F3") |
 | \`placeholder\` | \`string? | null\` | Placeholder image URL when empty |
 | \`printProfile\` | \`Partial<ChamevoPrintAreaOptions>[]?\` | Custom print profile overrides |
+| \`exportOnly\` | \`boolean?\` | Whole-view output area: hidden in the customizer, composited on export (default: false) |
+| \`excludeFromExport\` | \`boolean?\` | Design-only zone: interactive in the customizer, but **no print file** is produced for it. Mutually exclusive with \`exportOnly\` (default: false) |
 
 ---
 
