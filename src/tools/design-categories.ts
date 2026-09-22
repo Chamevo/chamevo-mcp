@@ -35,7 +35,11 @@ export const DESIGN_CATEGORY_TOOLS: Tool[] = [
         title: { type: 'string', description: 'Category title' },
         options: { type: 'object', description: 'Category-level option overrides' },
         thumbnail: { type: 'string', description: 'Category thumbnail URL' },
-        designs: { type: 'array', description: 'Initial design definitions' },
+        designs: {
+          type: 'array',
+          description:
+            'Design items of the category (the WHOLE list). Each item is either a static graphic { id, title, image, thumbnail, parameters } or a graphic block — a template made of several editable layers — { id, title, elements: [{ type, title, source, parameters }], thumbnail, parameters, width, height }. An item carries `image` OR `elements`, never both.',
+        },
         parent_id: { type: 'number', description: 'Parent category ID (0 = root)' },
         order: { type: 'number', description: 'Sort position' },
       },
@@ -53,7 +57,11 @@ export const DESIGN_CATEGORY_TOOLS: Tool[] = [
         options: { type: 'object', description: 'Category-level option overrides' },
         thumbnail: { type: 'string', description: 'Category thumbnail URL' },
         parent_id: { type: 'number', description: 'New parent category ID (0 = root)' },
-        designs: { type: 'array', description: 'Replace design definitions' },
+        designs: {
+          type: 'array',
+          description:
+            'Replaces ALL design items — send every item you want to keep. Design items of the category (the WHOLE list). Each item is either a static graphic { id, title, image, thumbnail, parameters } or a graphic block — a template made of several editable layers — { id, title, elements: [{ type, title, source, parameters }], thumbnail, parameters, width, height }. An item carries `image` OR `elements`, never both.',
+        },
         order: { type: 'number', description: 'Sort position' },
       },
     },
